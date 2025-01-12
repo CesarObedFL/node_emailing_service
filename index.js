@@ -29,7 +29,13 @@ app.post("/send-email", (req, res, next) => {
         text: message,
     };
 
-    res.json({"email_sended" : 'successfully!...'});
+    transporter.sendMail(mailOptions, function(error, info){
+        if (error) {
+            res.json({"email_sent" : 'error:' + error + '!'});
+        }
+        res.json({"email_sent" : 'successfully!' + info.response});
+    });
+    
 });
 
 
