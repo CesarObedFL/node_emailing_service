@@ -21,7 +21,15 @@ app.use(express.json()); // for parsing application/json
 
 app.post("/send-email", (req, res, next) => {
     const message = req.body.message;
-    res.json({"receivedMessage": message});
+    
+    let mailOptions = {
+        from: email,
+        to: email,
+        subject: 'Test Email from Node.js',
+        text: message,
+    };
+
+    res.json({"email_sended" : 'successfully!...'});
 });
 
 
