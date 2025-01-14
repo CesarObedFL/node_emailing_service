@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
 const nodemailer = require('nodemailer');
 const app = express();
 
@@ -17,7 +18,7 @@ let transporter = nodemailer.createTransport({
 
 
 app.use(express.json()); // for parsing application/json
-
+app.use(cors({ origin: process.env.PORTFOLIO_URL })); 
 
 app.post("/send-email", (req, res, next) => {
     const message = req.body.message;
