@@ -21,20 +21,28 @@ app.use(express.json()); // for parsing application/json
 app.use(cors({ origin: process.env.PORTFOLIO_URL })); 
 
 app.post("/send-email", (req, res, next) => {
-    const message = req.body.message;
+
+    console.log('message received!...');
+
+    const client_full_name = req.body.full_name;
+    const client_email = req.body.email;
+    const client_subject = req.body.subject;
+    const client_message = req.body.message;
+
+    const body_message = "Client: " + client_full_name + "  Email: " + client_email + "  Message: " + client_message;
     
     let mailOptions = {
         from: email,
         to: email,
-        subject: 'Test Email from Node.js',
-        text: message,
+        subject: 'Emailing from cesarobedfl.pro: ' + client_subject,
+        text: body_message,
     };
 
     transporter.sendMail(mailOptions, function(error, info){
         if (error) {
-            res.json({"email_sent" : 'error:' + error + '!'});
+            res.json({"error" : 'error:' + error + '!'});
         }
-        res.json({"email_sent" : 'successfully!' + info.response});
+        res.json({"success" : 'email received successfully!'});
     });
     
 });
