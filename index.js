@@ -7,6 +7,11 @@ const app = express();
 const email = process.env.EMAIL;
 const email_password = process.env.EMAIL_PASSWORD;
 
+const port = (process.env.PORT || 3000);
+
+// settings
+app.set('port', port);
+
 
 let transporter = nodemailer.createTransport({
     service: 'gmail', // Use your email provider
@@ -18,7 +23,7 @@ let transporter = nodemailer.createTransport({
 
 
 app.use(express.json()); // for parsing application/json
-app.use(cors({ origin: process.env.PORTFOLIO_URL })); 
+app.use(cors({ origin: process.env.URL })); 
 
 app.post("/send-email", (req, res, next) => {
 
@@ -48,8 +53,8 @@ app.post("/send-email", (req, res, next) => {
 });
 
 
-app.listen(3000, () => {
-    console.log("Server running on port 3000");
+app.listen(app.get('port'), () => {
+    console.log(`running in port ${app.get('port')}`);
 });
 
    
