@@ -54,7 +54,7 @@ app.post("/send-email", (req, res, next) => {
 
 
 app.listen(app.get('port'), () => {
-    console.log(`running in port ${app.get('port')}`);
+    console.log(`running in port ${app.get('port')} and the cors url allowed is ${process.env.URL}`);
 });
 
    
