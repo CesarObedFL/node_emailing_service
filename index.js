@@ -52,7 +52,7 @@ app.post("/send-email", (req, res, next) => {
     
 });
 
-app.get("/config", (res, next) => {
+app.get("/config", (req, res, next) => {
     res.json({
         "port": app.get('port'),
         "sending email": email,
