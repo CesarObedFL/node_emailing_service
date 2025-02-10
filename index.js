@@ -13,8 +13,6 @@ const port = (process.env.PORT || 3000);
 // settings
 app.set('port', port);
 
-const { RecaptchaEnterpriseServiceClient } = require('@google-cloud/recaptcha-enterprise');
-
 /**
   * Crea una evaluación para analizar el riesgo de una acción de la IU.
   *
@@ -85,7 +83,7 @@ let transporter = nodemailer.createTransport({
 app.use(express.json()); // for parsing application/json
 app.use(cors({ origin: process.env.URL }));
 
-app.post("/send-email", (req, res, next) => {
+app.post("/send-email", async (req, res, next) => {
 
     console.log('message received!...');
 
@@ -93,22 +91,34 @@ app.post("/send-email", (req, res, next) => {
     const client_email = req.body.email;
     const client_subject = req.body.subject;
     const client_message = req.body.message;
+    const token = req.body;
 
-    const body_message = "Client: " + client_full_name + "  Email: " + client_email + "  Message: " + client_message;
-
-    let mailOptions = {
-        from: email,
-        to: email,
-        subject: 'Emailing from cesarobedfl.pro: ' + client_subject,
-        text: body_message,
-    };
-
-    transporter.sendMail(mailOptions, function (error, info) {
-        if (error) {
-            res.json({ "error": 'error:' + error + '!' });
-        }
-        res.json({ "success": 'email received successfully!' });
+    const score = await createAssessment({
+        token,
+        // ... otros parámetros
     });
+
+    if (score && score >= 0.5) {
+
+        const body_message = "Client: " + client_full_name + "  Email: " + client_email + "  Message: " + client_message;
+
+        let mailOptions = {
+            from: email,
+            to: email,
+            subject: 'Emailing from cesarobedfl.pro: ' + client_subject,
+            text: body_message,
+        };
+
+        transporter.sendMail(mailOptions, function (error, info) {
+            if (error) {
+                res.json({ "error": 'error:' + error + '!' });
+            }
+            res.json({ "success": 'email received successfully!' });
+        });
+
+    } else {
+        res.status(400).json({ error: 'invalid reCaptcha!...' });
+    }
 
 });
 
