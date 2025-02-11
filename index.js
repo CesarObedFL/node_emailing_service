@@ -27,7 +27,7 @@ async function createAssessment({
     project_id = process.env.PROJECT_ID,
     recaptcha_key = process.env.RECAPTCHA_KEY,
     token = "action-token",
-    recaptchaAction = "action-name",
+    recaptchaAction = "send_email_form",
 }) {
     // Crea el cliente de reCAPTCHA.
     // TODO: almacena en caché el código de generación de clientes (recomendado) o llama a client.close() antes de salir del método.
