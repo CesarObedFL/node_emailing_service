@@ -4,6 +4,7 @@ const cors = require('cors');
 const nodemailer = require('nodemailer');
 const app = express();
 const { RecaptchaEnterpriseServiceClient } = require('@google-cloud/recaptcha-enterprise');
+const { GoogleAuth } = require('google-auth-library');
 
 const email = process.env.EMAIL;
 const email_password = process.env.EMAIL_PASSWORD;
@@ -29,9 +30,16 @@ async function createAssessment({
     token = "action-token",
     recaptchaAction = "send_email_form",
 }) {
+
+    const auth = new GoogleAuth({
+        scopes: ['https://www.googleapis.com/auth/recaptchaenterprise'],
+    });
+
+    const auth_client = await auth.getClient();
+
     // Crea el cliente de reCAPTCHA.
     // TODO: almacena en caché el código de generación de clientes (recomendado) o llama a client.close() antes de salir del método.
-    const client = new RecaptchaEnterpriseServiceClient();
+    const client = new RecaptchaEnterpriseServiceClient({auth: auth_client});
     const projectPath = client.projectPath(project_id);
 
     // Crea la solicitud de evaluación.
