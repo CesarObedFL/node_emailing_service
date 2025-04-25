@@ -4,7 +4,7 @@ const cors = require('cors');
 const nodemailer = require('nodemailer');
 const app = express();
 const { RecaptchaEnterpriseServiceClient } = require('@google-cloud/recaptcha-enterprise');
-const { GoogleAuth } = require('google-auth-library');
+//const { GoogleAuth } = require('google-auth-library');
 
 const email = process.env.EMAIL;
 const email_password = process.env.EMAIL_PASSWORD;
@@ -15,66 +15,81 @@ const port = (process.env.PORT || 3000);
 app.set('port', port);
 
 /**
-  * Crea una evaluación para analizar el riesgo de una acción de la IU.
-  *
-  * project_id: El ID del proyecto de Google Cloud.
-  * recaptcha_site_key: La clave reCAPTCHA asociada con el sitio o la aplicación
-  * token: El token generado obtenido del cliente.
-  * recaptchaAction: El nombre de la acción que corresponde al token.
+* Create an assessment to analyze the risk of a UI action. Note that
+* this example does set error boundaries and returns `null` for
+* exceptions.
+*
+* projectID: Google Cloud project ID
+* recaptchaKey: reCAPTCHA key obtained by registering a domain or an app to use the services of reCAPTCHA Enterprise.
+* token: The token obtained from the client on passing the recaptchaKey.
+* recaptchaAction: Action name corresponding to the token.
+* userIpAddress: The IP address of the user sending a request to your backend is available in the HTTP request.
+* userAgent: The user agent is included in the HTTP request in the request header.
+* ja4: JA4 fingerprint associated with the request.
+* ja3: JA3 fingerprint associated with the request.
 */
-
 async function createAssessment({
-    // Reemplaza el token y las variables de acción de reCAPTCHA antes de ejecutar la muestra.
-    project_id = process.env.PROJECT_ID,
-    recaptcha_key = process.env.RECAPTCHA_KEY,
+    projectID = "your-project-id",
+    recaptchaKey = "your-recaptcha-key",
     token = "action-token",
-    recaptchaAction = "send_email_form",
+    recaptchaAction = "action-name",
+    userIpAddress = "user-ip-address",
+    userAgent = "user-agent",
+    ja4 = "ja4",
+    ja3 = "ja3"
 }) {
+    // Create the reCAPTCHA client & set the project path. There are multiple
+    // ways to authenticate your client. For more information see:
+    // https://cloud.google.com/docs/authentication
+    // TODO: To avoid memory issues, move this client generation outside
+    // of this example, and cache it (recommended) or call client.close()
+    // before exiting this method.
+    const client = new RecaptchaEnterpriseServiceClient();
+    const projectPath = client.projectPath(projectID);
 
-    const auth = new GoogleAuth({
-        scopes: ['https://www.googleapis.com/auth/recaptchaenterprise'],
-    });
-
-    const auth_client = await auth.getClient();
-
-    // Crea el cliente de reCAPTCHA.
-    // TODO: almacena en caché el código de generación de clientes (recomendado) o llama a client.close() antes de salir del método.
-    const client = new RecaptchaEnterpriseServiceClient({auth: auth_client});
-    const projectPath = client.projectPath(project_id);
-
-    // Crea la solicitud de evaluación.
+    // Build the assessment request.
     const request = ({
         assessment: {
             event: {
                 token: token,
-                siteKey: recaptcha_key,
+                siteKey: recaptchaKey,
+                userIpAddress: userIpAddress,
+                userAgent: userAgent,
+                ja4: ja4,
+                ja3: ja3,
             },
         },
         parent: projectPath,
     });
 
+    // client.createAssessment() can return a Promise or take a Callback
     const [response] = await client.createAssessment(request);
 
-    // Verifica si el token es válido.
+    // Check if the token is valid.
     if (!response.tokenProperties.valid) {
-        console.log(`The CreateAssessment call failed because the token was: ${response.tokenProperties.invalidReason}`);
+        console.log("The CreateAssessment call failed because the token was: " +
+            response.tokenProperties.invalidReason);
+
         return null;
     }
 
-    // Verifica si se ejecutó la acción esperada.
-    // The `action` property is set by user client in the grecaptcha.enterprise.execute() method.
+    // Check if the expected action was executed.
+    // The `action` property is set by user client in the
+    // grecaptcha.enterprise.execute() method.
     if (response.tokenProperties.action === recaptchaAction) {
-        // Obtén la puntuación de riesgo y los motivos.
-        // Para obtener más información sobre cómo interpretar la evaluación, consulta:
-        // https://cloud.google.com/recaptcha-enterprise/docs/interpret-assessment
-        console.log(`The reCAPTCHA score is: ${response.riskAnalysis.score}`);
+
+        // Get the risk score and the reason(s).
+        // For more information on interpreting the assessment,
+        // see: https://cloud.google.com/recaptcha/docs/interpret-assessment
+        console.log("The reCAPTCHA score is: " + response.riskAnalysis.score);
+
         response.riskAnalysis.reasons.forEach((reason) => {
             console.log(reason);
         });
-
         return response.riskAnalysis.score;
     } else {
-        console.log("The action attribute in your reCAPTCHA tag does not match the action you are expecting to score");
+        console.log("The action attribute in your reCAPTCHA tag " +
+            "does not match the action you are expecting to score");
         return null;
     }
 }
@@ -92,22 +107,28 @@ app.use(express.json()); // for parsing application/json
 app.use(cors({ origin: process.env.URL }));
 
 app.post("/send-email", async (req, res, next) => {
-
     console.log('message received!...');
 
     const client_full_name = req.body.full_name;
     const client_email = req.body.email;
     const client_subject = req.body.subject;
     const client_message = req.body.message;
-    const token = req.body;
+    const token = req.body.captcha_token; // Get the token from the request body
+
+    console.log('token:' + token);
 
     const score = await createAssessment({
-        token,
-        // ... otros parámetros
+        projectID: process.env.PROJECT_ID,
+        recaptchaKey: process.env.RECAPTCHA_KEY,
+        token: token, // Pass the token to createAssessment
+        recaptchaAction: "send_email_form",
+        userIpAddress : "172.0.0.1",
+        userAgent: "user-agent",
+        ja4 : "ja4",
+        ja3 : "ja3",
     });
 
-    if (score && score >= 0.5) {
-
+    if (score && score >= 0.5) { // Adjust the threshold as needed
         const body_message = "Client: " + client_full_name + "  Email: " + client_email + "  Message: " + client_message;
 
         let mailOptions = {
@@ -120,14 +141,13 @@ app.post("/send-email", async (req, res, next) => {
         transporter.sendMail(mailOptions, function (error, info) {
             if (error) {
                 res.json({ "error": 'error:' + error + '!' });
+            } else {
+                res.json({ "success": 'email received successfully!' });
             }
-            res.json({ "success": 'email received successfully!' });
         });
-
     } else {
-        res.status(400).json({ error: 'invalid reCaptcha!...' });
+        res.status(400).json({ error: 'Invalid reCaptcha!...' });
     }
-
 });
 
 app.get("/config", (req, res, next) => {
