@@ -114,6 +114,7 @@ app.post("/send-email", async (req, res, next) => {
     const client_subject = req.body.subject;
     const client_message = req.body.message;
     const token = req.body.captcha_token; // Get the token from the request body
+    const client_ip = req.ip;
 
     console.log('token:' + token);
 
@@ -122,7 +123,7 @@ app.post("/send-email", async (req, res, next) => {
         recaptchaKey: process.env.RECAPTCHA_KEY,
         token: token, // Pass the token to createAssessment
         recaptchaAction: "send_email_form",
-        userIpAddress : "172.0.0.1",
+        userIpAddress : client_ip,
         userAgent: "user-agent",
         ja4 : "ja4",
         ja3 : "ja3",
