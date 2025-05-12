@@ -4,7 +4,6 @@ const cors = require('cors');
 const nodemailer = require('nodemailer');
 const app = express();
 const { RecaptchaEnterpriseServiceClient } = require('@google-cloud/recaptcha-enterprise');
-//const { GoogleAuth } = require('google-auth-library');
 
 const email = process.env.EMAIL;
 const email_password = process.env.EMAIL_PASSWORD;
