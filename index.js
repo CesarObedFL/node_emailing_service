@@ -105,7 +105,7 @@ let transporter = nodemailer.createTransport({
 app.use(express.json()); // for parsing application/json
 app.use(cors({ origin: process.env.URL }));
 
-app.post("/send-email", async (req, res, next) => {
+app.post("/request", async (req, res, next) => {
     console.log('message received!...');
 
     const client_full_name = req.body.full_name;
