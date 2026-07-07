@@ -159,7 +159,7 @@ app.get("/config", (req, res, next) => {
 });
 
 
-app.listen(app.get('port'), () => {
+app.listen(app.get('port'), '127.0.0.1', () => {
     console.log(`running in port ${app.get('port')} and the cors url allowed is ${process.env.URL}`);
 });
 
