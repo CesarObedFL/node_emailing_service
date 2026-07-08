@@ -1,9 +1,12 @@
-require('dotenv').config();
+const path = require('path'); 
+const dotenv = require('dotenv');
 const express = require('express');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
 const app = express();
 const { RecaptchaEnterpriseServiceClient } = require('@google-cloud/recaptcha-enterprise');
+
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const email = process.env.EMAIL;
 const email_password = process.env.EMAIL_PASSWORD;
