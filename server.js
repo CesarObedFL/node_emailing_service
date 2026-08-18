@@ -6,52 +6,23 @@ const nodemailer = require('nodemailer');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
 
-// Load environment variables
+// load .env
 dotenv.config({ path: path.join(__dirname, '.env') });
 
-// ---------------------------------------------------------------------
-// Configuration constants
-// ---------------------------------------------------------------------
+const email = process.env.EMAIL;
+const email_password = process.env.EMAIL_PASSWORD;
+const jwt_secret = process.env.JWT_SECRET;
+const client_url = process.env.CLIENT_URL || process.env.URL;
 
-/** @var {string} Email address used as sender and receiver */
-const EMAIL = process.env.EMAIL;
-
-/** @var {string} Gmail App Password */
-const EMAIL_PASSWORD = process.env.EMAIL_PASSWORD;
-
-/** @var {number} Port the server will listen on */
-const PORT = process.env.PORT || 3000;
-
-/** @var {string} Secret key for JWT verification */
-const JWT_SECRET = process.env.JWT_SECRET;
-
-// ---------------------------------------------------------------------
-// Validate required environment variables
-// ---------------------------------------------------------------------
-
-if (!JWT_SECRET) {
-    console.error('FATAL ERROR: JWT_SECRET is not defined in .env file');
+if (!jwt_secret) {
+    console.error('FATAL ERROR: JWT_SECRET is not defined in .env');
     process.exit(1);
 }
-
-if (!EMAIL || !EMAIL_PASSWORD) {
-    console.error('FATAL ERROR: EMAIL or EMAIL_PASSWORD is not defined in .env file');
-    process.exit(1);
-}
-
-// ---------------------------------------------------------------------
-// Express app initialization
-// ---------------------------------------------------------------------
 
 const app = express();
 
-app.set('port', PORT);
 app.use(express.json());
-app.use(cors({ origin: process.env.CLIENT_URL }));
-
-// ---------------------------------------------------------------------
-// Nodemailer transporter setup
-// ---------------------------------------------------------------------
+app.use(cors({ origin: client_url }));
 
 /**
  * Nodemailer transporter configured for Gmail
@@ -60,11 +31,9 @@ app.use(cors({ origin: process.env.CLIENT_URL }));
  */
 const transporter = nodemailer.createTransport({
     service: 'gmail',
-    auth: {
-        user: EMAIL,
-        pass: EMAIL_PASSWORD,
-    }
+    auth: { user: email, pass: email_password },
 });
+
 
 /**
  * Writes a log entry to logs.txt with timestamp
@@ -81,22 +50,22 @@ function write_log(message) {
 }
 
 /**
- * Sends an email using the configured transporter
+ * GET /config
  * 
- * @param {string} to Recipient email address
- * @param {string} subject Email subject
- * @param {string} text Plain text body
- * @returns {Promise<object>} Nodemailer send result
+ * Returns public configuration of the service.
+ * 
+ * @route GET /config
+ * @param {express.Request} req - Express request object
+ * @param {express.Response} res - Express response object
+ * @returns {void} JSON with configuration
  */
-async function send_email(to, subject, text) {
-    const mail_options = {
-        from: EMAIL,
-        to: to,
-        subject: subject,
-        text: text,
-    };
-    return await transporter.sendMail(mail_options);
-}
+app.get('/config', (req, res) => {
+    res.json({
+        port: process.env.PORT || 3000,
+        sending_email: email,
+        cors_url: client_url || 'not set',
+    });
+});
 
 /**
  * POST /request
@@ -121,10 +90,19 @@ async function send_email(to, subject, text) {
  * @param {express.Response} res - Express response object
  * @returns {void} JSON response with success or error
  */
-app.post("/request", async (req, res, next) => {
-    const client_ip = req.ip;
+app.post('/request', async (req, res) => {
+    console.log('📩 New email request received');
 
-    // --- 1. Extract JWT from Authorization header ---
+    const { full_name, email: client_email, subject, message } = req.body;
+    const client_ip = req.ip || req.connection.remoteAddress;
+
+    // 1. fields validation
+    if (!full_name || !client_email || !subject || !message) {
+        write_log(`Bad request - IP: ${client_ip} - Missing required fields`);
+        return res.status(400).json({ error: 'Missing required fields: full_name, email, subject, message' });
+    }
+
+    // 2. Authorization header validation
     const auth_header = req.headers.authorization;
     if (!auth_header || !auth_header.startsWith('Bearer ')) {
         write_log(`Unauthorized attempt - IP: ${client_ip} - Missing or invalid Authorization header`);
@@ -133,69 +111,51 @@ app.post("/request", async (req, res, next) => {
 
     const token = auth_header.split(' ')[1];
 
-    // --- 2. Verify JWT ---
+    // 3. JWT verification (sync with try/catch)
     let decoded;
     try {
-        decoded = jwt.verify(token, JWT_SECRET);
-    } catch (error) {
-        write_log(`JWT verification failed - IP: ${client_ip} - Error: ${error.message}`);
+        decoded = jwt.verify(token, jwt_secret);
+    } catch (err) {
+        write_log(`JWT verification failed - IP: ${client_ip} - Error: ${err.message}`);
         return res.status(401).json({ error: 'Invalid or expired token' });
     }
 
-    // --- 3. Check token payload ---
+    // 4. payload validation
     if (!decoded.verified || decoded.verified !== true) {
         write_log(`Invalid JWT payload - IP: ${client_ip} - verified claim is not true`);
-        return res.status(403).json({ error: 'Token does not grant email sending permission' });
+        return res.status(403).json({ error: 'Token does not have verified: true' });
     }
 
-    // Optional: check token type
     if (decoded.type && decoded.type !== 'email_verification') {
-        write_log(`Invalid token type - IP: ${client_ip} - expected 'email_verification', got '${decoded.type}'`);
+        write_log(`Invalid JWT payload - IP: ${client_ip} - invalid type: ${decoded.type}`);
         return res.status(403).json({ error: 'Invalid token type' });
     }
 
-    // --- 4. Extract email data from body ---
-    const { full_name, email: client_email, subject, message } = req.body;
-
-    if (!full_name || !client_email || !subject || !message) {
-        return res.status(400).json({ error: 'Missing required fields: full_name, email, subject, message' });
-    }
-
-    // --- 5. Build email content ---
+    // 5. send email
     const body_text = `Client: ${full_name}\nEmail: ${client_email}\nMessage: ${message}`;
-    const email_subject = `Email from cesarobedfl.pro: ${subject}`;
+    const mail_options = {
+        from: email,
+        to: email,
+        subject: `Email from cesarobedfl.pro: ${subject}`,
+        text: body_text,
+    };
 
-    // --- 6. Send email ---
     try {
-        const info = await send_email(EMAIL, email_subject, body_text);
-        write_log(`Email sent successfully - IP: ${client_ip} - To: ${EMAIL} - MessageId: ${info.messageId}`);
+        const info = await transporter.sendMail(mail_options);
+        console.log('✅ Email sent successfully:', info.messageId);
         res.json({ success: 'Email sent successfully' });
     } catch (error) {
-        write_log(`Email sending error - IP: ${client_ip} - Error: ${error.message}`);
-        res.status(500).json({ error: 'Failed to send email' });
+        write_log(`Email send error - IP: ${client_ip} - Error: ${error.message}`);
+        res.status(500).json({ error: 'Error sending email' });
     }
 });
 
-/**
- * GET /config
- * 
- * Returns public configuration of the service.
- * 
- * @route GET /config
- * @param {express.Request} req - Express request object
- * @param {express.Response} res - Express response object
- * @returns {void} JSON with configuration
- */
-app.get("/config", (req, res) => {
-    res.json({
-        port: app.get('port'),
-        sending_email: EMAIL,
-        cors_url: process.env.URL,
+module.exports = app;
+
+if (require.main === module) {
+    const port = process.env.PORT || 3000;
+    app.listen(port, () => {
+        console.log(`🚀 Email microservice running on port ${port}`);
+        console.log(`🔗 CORS allowed: ${process.env.CLIENT_URL || 'undefined'}`);
     });
-});
-
-
-app.listen(app.get('port'), '127.0.0.1', () => {
-    console.log(`🚀 Email microservice running on port ${app.get('port')}`);
-    console.log(`🔗 CORS allowed: ${process.env.URL}`);
-});
+}
