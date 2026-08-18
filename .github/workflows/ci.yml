@@ -48,6 +48,7 @@ jobs:
       - name: Run tests
         run: pnpm test
         env:
+          NODE_ENV: test
           JWT_SECRET: test_secret
           EMAIL: test@example.com
           EMAIL_PASSWORD: test_pass

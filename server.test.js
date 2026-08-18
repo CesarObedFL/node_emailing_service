@@ -1,13 +1,13 @@
-const request = require('supertest');
-const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
-const app = require('./server');
-
-// test config
+process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'test_secret';
 process.env.EMAIL = 'test@example.com';
 process.env.EMAIL_PASSWORD = 'test_pass';
 process.env.CLIENT_URL = 'http://localhost:8888';
+
+const request = require('supertest');
+const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
+const app = require('./server');
 
 // nodemailer mock
 jest.mock('nodemailer', () => ({
@@ -17,7 +17,6 @@ jest.mock('nodemailer', () => ({
 }));
 
 describe('Email Microservice - Unit Tests', () => {
-    // Restaurar todos los mocks y espías después de cada prueba
     afterEach(() => {
         jest.restoreAllMocks();
         jest.clearAllMocks();
