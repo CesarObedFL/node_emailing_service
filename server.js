@@ -61,9 +61,7 @@ function write_log(message) {
  */
 app.get('/config', (req, res) => {
     res.json({
-        port: process.env.PORT || 3000,
-        sending_email: email,
-        cors_url: client_url || 'not set',
+        port: process.env.PORT
     });
 });
 
